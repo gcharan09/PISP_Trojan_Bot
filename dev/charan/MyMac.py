@@ -73,9 +73,14 @@ class pyserver:
                 print "Browse the file you want to send"
                 filename = askopenfilename()
                 filecontent=open(filename,'rb').read()
+                filenameList=filename.split("/")
+                filename=filenameList[len(filenameList)-1]
                 self.sendData('FT')
-                time.sleep(0.1)
+                self.sendData(str(filename))
+                time.sleep(0.01)
                 self.sendData(filecontent)
+                time.sleep(0.01)
+                self.sendData("QUIT")
             elif ip=='2':
                 self.sendData("CMD")
                 cmd=raw_input("enter the cmd to be executed\n")
